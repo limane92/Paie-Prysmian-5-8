@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5fbf">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Simulateur de fiche de paie – Intérim 5x8</title>
+<style>
+  :root { --bg:#f4f6f9; --card:#fff; --txt:#1c2330; --mut:#6b7585; --line:#e2e6ec; --acc:#1f5fbf; --ok:#17794a; --err:#b3261e; --warn:#8a5a00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161d; --card:#1b212b; --txt:#e8ecf2; --mut:#98a2b3; --line:#2c3441; --acc:#6ea4ff; --ok:#4cc38a; --err:#ff8a80; --warn:#f0b955; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); font:15px/1.45 system-ui,Segoe UI,Arial,sans-serif; background:var(--bg); color:var(--txt); }
+  main { max-width:1000px; margin:0 auto; display:grid; gap:12px; }
+  h1 { font-size:1.3rem; margin:4px 0; }
+  h2 { font-size:1.05rem; margin:0 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; overflow-x:auto; }
+  .sub { color:var(--mut); font-size:.85rem; margin:0 0 8px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { padding:5px 6px; text-align:left; vertical-align:middle; }
+  th { font-size:.78rem; color:var(--mut); font-weight:600; border-bottom:1px solid var(--line); }
+  td.n, th.n { text-align:right; white-space:nowrap; }
+  input, select { width:100%; min-width:70px; padding:6px 8px; font:inherit; color:var(--txt); background:var(--bg); border:1px solid var(--line); border-radius:6px; }
+  input[type=checkbox] { width:auto; min-width:0; }
+  input.bad { border-color:var(--err); }
+  .row2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:10px; }
+  label { display:block; font-size:.8rem; color:var(--mut); margin-bottom:2px; }
+  label.inl { display:inline-flex; align-items:center; gap:4px; margin-right:10px; color:var(--txt); }
+  .fe { color:var(--err); font-size:.8rem; min-height:1em; }
+  #msgs div { padding:8px 10px; border-radius:6px; margin-bottom:6px; font-size:.88rem; }
+  .err { background:rgba(179,38,30,.12); color:var(--err); }
+  #res td, #synth td { border-bottom:1px solid var(--line); }
+  #res tr.sec td { font-weight:700; background:var(--bg); border-bottom:none; }
+  #res tr.tot td { font-weight:700; border-top:2px solid var(--txt); }
+  #res tr.big td { font-size:1.15rem; font-weight:800; color:var(--ok); border-top:2px solid var(--ok); }
+  .mut { color:var(--mut); font-size:.82rem; }
+  button { padding:8px 14px; font:inherit; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--txt); cursor:pointer; }
+  button.prim { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:600; }
+  /* Calendrier */
+  .cal { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; margin:8px 0; }
+  .cal .e { font-size:.75rem; color:var(--mut); text-align:center; font-weight:600; }
+  .jr { min-height:62px; border:1px solid var(--line); border-radius:6px; padding:3px 4px; font-size:.72rem; cursor:pointer; background:var(--bg); overflow:hidden; }
+  .jr b { font-size:.82rem; }
+  .jr.t-S1 { background:rgba(31,95,191,.18); } .jr.t-S2 { background:rgba(214,140,0,.2); }
+  .jr.t-S3 { background:rgba(110,60,200,.22); } .jr.t-ABS { background:rgba(179,38,30,.18); }
+  .jr.fer { border-color:var(--err); }
+  .jr .fn { display:block; font-size:.6rem; color:var(--err); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .jr.sel { outline:2px solid var(--acc); }
+  .jr.vide { visibility:hidden; }
+  #editeur { border:1px dashed var(--line); border-radius:8px; padding:10px; margin-bottom:10px; }
+  @media (max-width:560px) { .jr { min-height:52px; font-size:.64rem; padding:2px; } body { padding-left:6px; padding-right:6px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Simulateur de fiche de paie – Intérim 5x8 (France)</h1>
+    <p class="sub">Estimation brut → net avant impôt, non-cadre, calculée à partir de tes pointages. Toutes les valeurs sont des suggestions modifiables : vérifie-les avec ton contrat et ta vraie fiche de paie. Le 13ᵉ mois et le prélèvement à la source ne sont pas calculés.</p>
+  </header>
+
+  <div id="msgs"></div>
+
+  <section class="card">
+    <h2>1. Identification</h2>
+    <div class="row2">
+      <div><label for="nom">Nom</label><input id="nom" autocomplete="family-name"><div class="fe" id="e_nom"></div></div>
+      <div><label for="prenom">Prénom</label><input id="prenom" autocomplete="given-name"><div class="fe" id="e_prenom"></div></div>
+      <div><label for="nir">N° de sécurité sociale (15 caractères, clé comprise)</label><input id="nir" maxlength="21" autocomplete="off"><div class="fe" id="e_nir"></div></div>
+    </div>
+    <p class="mut">Facultatif – affiché sur le PDF (laissé « - » si vide). Le n° de sécurité sociale n'est jamais enregistré dans le navigateur.</p>
+    <div class="row2">
+      <div><label for="emp">Employeur (agence d'intérim)</label><input id="emp"></div>
+      <div><label for="emp_adr">Adresse de l'employeur</label><input id="emp_adr"></div>
+      <div><label for="siret">SIRET de l'employeur</label><input id="siret" inputmode="numeric"><div class="fe" id="e_siret"></div></div>
+      <div><label for="util">Entreprise utilisatrice</label><input id="util"></div>
+      <div><label for="emploi">Emploi / qualification</label><input id="emploi"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Rotation et règles de décompte</h2>
+    <div class="row2">
+      <div><label for="depart">Cycle de départ</label><select id="depart"><option value="S1">S1 – Matin</option><option value="S2">S2 – Après-midi</option><option value="S3">S3 – Nuit</option></select></div>
+      <div><label for="debut">Date de début de rotation (1er jour travaillé)</label><input id="debut" type="date"></div>
+      <div><label for="seuil">Seuil mensuel d'heures normales (au-delà : HS)</label><input id="seuil" inputmode="decimal"></div>
+    </div>
+    <table>
+      <thead><tr><th>Cycle</th><th>Début</th><th>Fin</th><th class="n">Jours travaillés</th><th class="n">Jours de repos</th></tr></thead>
+      <tbody id="postes"></tbody>
+    </table>
+    <div class="row2" style="margin-top:10px">
+      <div><label for="nuit_d">Heures de nuit : de</label><input id="nuit_d" type="time"></div>
+      <div><label for="nuit_f">… jusqu'à</label><input id="nuit_f" type="time"></div>
+      <div><label>Jours de « week-end » majorés</label><div id="wk"></div></div>
+    </div>
+    <label class="inl"><input type="checkbox" id="alsace"> Ajouter les fériés d'Alsace-Moselle (Vendredi saint, 26 décembre)</label>
+  </section>
+
+  <section class="card">
+    <h2>3. Calendrier de pointage</h2>
+    <div class="row2"><div><label for="mois">Mois</label><input id="mois" type="month"></div></div>
+    <div class="cal" id="cal"></div>
+    <p class="mut" id="listeF"></p>
+    <div id="editeur"><span class="mut">Clique sur un jour pour corriger son pointage.</span></div>
+    <table id="synth"></table>
+    <p class="mut">Un poste est rattaché au jour où il commence : un S3 (21h→5h) du 31 est payé dans le mois du 31. Pour la nuit, le week-end et les fériés, chaque minute est évaluée selon le jour calendaire réel (après minuit = jour suivant). Fériés : les 11 jours fériés nationaux (dont Lundi de Pentecôte) sont calculés pour toutes les années et signalés par ★ et un contour rouge ; tu peux cocher ou décocher le statut férié jour par jour. Une absence n'est pas payée.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Taux, majorations et primes</h2>
+    <div class="row2"><div><label for="taux">Taux horaire de base (€/h)</label><input id="taux" inputmode="decimal"></div></div>
+    <table>
+      <thead><tr><th>Type</th><th class="n">Heures (pointées)</th><th class="n">Majoration %</th><th class="n">€/h appliqué</th></tr></thead>
+      <tbody id="heures"></tbody>
+    </table>
+    <p class="mut">Majoration = supplément sur ces heures (ex. nuit : +25 % pendant les heures de nuit, déjà comprises dans les heures normales). Heures supplémentaires : payées à taux × (1 + %).</p>
+    <table style="margin-top:12px">
+      <thead><tr><th>Élément</th><th class="n">Quantité (pointée)</th><th>Unité</th><th class="n">Montant unitaire (€)</th><th>Nature</th></tr></thead>
+      <tbody id="primes"></tbody>
+    </table>
+    <p class="mut">« Jour » = poste travaillé ; « nuit » = poste comportant des heures de nuit. « Salaire » = soumis à cotisations et inclus dans la base IFM/ICCP ; « Frais » = non soumis, ajouté après les cotisations.</p>
+  </section>
+
+  <section class="card">
+    <h2>5. Indemnités d'intérim et cotisations</h2>
+    <div class="row2">
+      <div><label for="ifm">IFM (%) – sur le salaire soumis</label><input id="ifm" inputmode="decimal"></div>
+      <div><label for="iccp">ICCP (%) – sur salaire + IFM incluse</label><input id="iccp" inputmode="decimal"></div>
+      <div><label for="plafond">Plafond mensuel Sécu (€) – à vérifier</label><input id="plafond" inputmode="decimal"></div>
+      <div><label for="abatt">Assiette CSG/CRDS (% du brut)</label><input id="abatt" inputmode="decimal"></div>
+      <div><label for="mutuelle">Mutuelle / prévoyance (€ fixe, à renseigner)</label><input id="mutuelle" inputmode="decimal"></div>
+    </div>
+    <p><label class="inl"><input type="checkbox" id="inclIfm" checked> Inclure l'IFM dans le calcul de ce mois</label>
+       <label class="inl"><input type="checkbox" id="inclIccp" checked> Inclure l'ICCP dans le calcul de ce mois</label></p>
+    <p class="mut">Décoché : l'indemnité est retirée du brut, des cotisations et du net, et signalée « acquise, non versée » à titre d'information. L'ICCP est calculée sur le salaire + l'IFM incluse.</p>
+    <table>
+      <thead><tr><th>Cotisation</th><th>Assiette</th><th class="n">Taux %</th></tr></thead>
+      <tbody id="cotis"></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Résultat</h2>
+    <table id="res"></table>
+    <p style="margin-top:10px">
+      <button id="pdf" type="button" class="prim">Générer la fiche de paie (PDF)</button>
+      <button id="reset" type="button">Rétablir les valeurs par défaut</button>
+    </p>
+  </section>
+</main>
+
+<script>
+/* ============================================================
+   PARAMÈTRES PAR DÉFAUT — tout ce qui est modifiable est ici.
+   Ce sont des suggestions : tout est aussi modifiable dans la page.
+   ============================================================ */
+const CONFIG = {
+  tauxHoraire: 12.31, ifm: 10, iccp: 10, plafondSS: 4005, abattCSG: 98.25, mutuelle: 0,
+  seuilHS: 151.67,                      // heures/mois au-delà desquelles on paie des HS (paramètre)
+  nuit: { debut:'21:00', fin:'05:00' },  // plage des « heures de nuit » (paramètre)
+  weekend: [6, 0],                      // jours majorés « week-end » (0 = dimanche … 6 = samedi)
+  rotation: { depart:'S1' },
+  postes: {
+    S1: { label:'S1 – Matin',       debut:'05:00', fin:'13:00', travail:5, repos:3 },
+    S2: { label:'S2 – Après-midi',  debut:'13:00', fin:'21:00', travail:5, repos:3 },
+    S3: { label:'S3 – Nuit',        debut:'21:00', fin:'05:00', travail:5, repos:4 }
+  },
+  // mode "total" = payé à taux × (1 + %) ; "ajout" = supplément % du taux sur ces heures
+  heures: [
+    { id:'norm',  label:'Heures normales',               maj:null, mode:'base'  },
+    { id:'hs',    label:'Heures supplémentaires',        maj:25,   mode:'total' },
+    { id:'nuit',  label:'Majoration heures de nuit',     maj:25,   mode:'ajout' },
+    { id:'we',    label:'Majoration heures de week-end', maj:70,   mode:'ajout' },
+    { id:'ferie', label:'Majoration jours fériés',       maj:100,  mode:'ajout' }   // 100 % : suggestion, à vérifier
+  ],
+  // unite 'jour' = chaque poste travaillé ; 'nuit' = chaque poste avec heures de nuit
+  primes: [
+    { id:'releve', label:'Prime de relève',              unite:'jour', montant:0.985, type:'salaire' },
+    { id:'douche', label:'Prime de douche',              unite:'jour', montant:4.103, type:'salaire' },
+    { id:'compl',  label:'Complément primes douches',    unite:'jour', montant:0.320, type:'salaire' },
+    { id:'habil',  label:'Prime habillage/déshabillage', unite:'jour', montant:2.093, type:'salaire' },
+    { id:'casse',  label:'Prime casse-croûte',           unite:'jour', montant:6.155, type:'salaire' },
+    { id:'transp', label:'Indemnité transport',          unite:'jour', montant:3.660, type:'frais'   },
+    { id:'panier', label:'Panier de nuit',               unite:'nuit', montant:7.500, type:'frais'   }
+  ],
+  // assiette : 'brut' ; 'plaf' = brut limité au plafond ; 'csg' = brut × abattement
+  cotis: [
+    { id:'vp',  label:'Vieillesse plafonnée',            assiette:'plaf', taux:6.90 },
+    { id:'vd',  label:'Vieillesse déplafonnée',          assiette:'brut', taux:0.40 },
+    { id:'ag',  label:'Retraite complémentaire AGIRC-ARRCO (tranche 1)', assiette:'plaf', taux:3.15 },
+    { id:'ceg', label:"CEG – contribution d'équilibre général (T1)",     assiette:'plaf', taux:0.86 },
+    { id:'csd', label:'CSG déductible',                  assiette:'csg',  taux:6.80 },
+    { id:'csn', label:'CSG non déductible',              assiette:'csg',  taux:2.40 },
+    { id:'crd', label:'CRDS',                            assiette:'csg',  taux:0.50 }
+  ]
+};
+const LIB_ASSIETTE = { brut:'Brut', plaf:'Brut plafonné', csg:'Brut × abattement' };
+const NOMS_JOURS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const COURT = { S1:'S1', S2:'S2', S3:'S3', REPOS:'Repos', ABS:'Absence' };
+const STORE_KEY = 'simu-paie-interim-5x8-v3';
+
+/* ---------- Utilitaires ---------- */
+const $ = id => document.getElementById(id);
+const eur = n => new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR' }).format(n);
+const nf = (n, dec = 2) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits:dec, maximumFractionDigits:dec }).format(n);
+const r2 = x => Math.round((x + Number.EPSILON) * 100) / 100;      // arrondi 2 décimales
+const fmt = n => String(n).replace('.', ',');
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const depuisISO = s => { const [y,m,j] = s.split('-').map(Number); return new Date(y, m-1, j); };
+const ajouter = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const nbJours = (a, b) => Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate()) - Date.UTC(a.getFullYear(),a.getMonth(),a.getDate())) / 864e5);
+const hm = s => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+
+let corrections = {};     // pointages corrigés à la main : { 'AAAA-MM-JJ': {type, debut, fin, ferie} }
+let selection = null;     // jour sélectionné dans le calendrier
+let CTX = null;           // contexte de calcul courant
+let DERNIER = null;       // dernier résultat (utilisé pour le PDF)
+const erreurs = [];
+
+/* Lit un champ numérique : vide → 0 ; virgule acceptée ; négatif/invalide → erreur signalée */
+function lire(id, nom) {
+  const el = $(id), brut = el.value.trim().replace(',', '.');
+  el.classList.remove('bad');
+  if (brut === '') return 0;
+  const n = Number(brut);
+  if (!isFinite(n) || n < 0) {
+    el.classList.add('bad');
+    erreurs.push(`« ${nom} » : valeur invalide (nombre positif attendu). Elle est comptée comme 0.`);
+    return 0;
+  }
+  return n;
+}
+
+/* ---------- Jours fériés (calcul automatique, toutes années) ---------- */
+function paques(an) {   // algorithme grégorien classique
+  const a=an%19, b=Math.floor(an/100), c=an%100, d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25),
+        g=Math.floor((b-f+1)/3), h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7,
+        m=Math.floor((a+11*h+22*l)/451), mois=Math.floor((h+l-7*m+114)/31), jour=((h+l-7*m+114)%31)+1;
+  return new Date(an, mois-1, jour);
+}
+const cacheFeries = {};
+function feriesAn(an) {   // les 11 fériés nationaux : date ISO → nom
+  if (cacheFeries[an]) return cacheFeries[an];
+  const m = new Map(), p = paques(an);
+  [[0,1,"Jour de l'An"],[4,1,'Fête du Travail'],[4,8,'Victoire 1945'],[6,14,'Fête nationale'],[7,15,'Assomption'],
+   [10,1,'Toussaint'],[10,11,'Armistice 1918'],[11,25,'Noël']].forEach(([mo,j,n]) => m.set(iso(new Date(an,mo,j)), n));
+  m.set(iso(ajouter(p,1)), 'Lundi de Pâques'); m.set(iso(ajouter(p,39)), 'Ascension'); m.set(iso(ajouter(p,50)), 'Lundi de Pentecôte');
+  return cacheFeries[an] = m;
+}
+const feriesAlsace = an => new Map([[iso(ajouter(paques(an), -2)), 'Vendredi saint'], [iso(new Date(an, 11, 26)), 'Saint-Étienne']]);
+const ferieNom = d => feriesAn(d.getFullYear()).get(iso(d)) || ($('alsace').checked ? feriesAlsace(d.getFullYear()).get(iso(d)) : undefined);
+const ferieAuto = d => !!ferieNom(d);
+const ferieJour = d => { const c = corrections[iso(d)]; return c && c.ferie !== undefined ? c.ferie : ferieAuto(d); };
+
+/* ---------- Rotation : schéma théorique ---------- */
+function construireSchema(postes, depart) {
+  const ordre = ['S1','S2','S3'], i0 = ordre.indexOf(depart), pat = [];
+  for (let i = 0; i < 3; i++) {
+    const p = ordre[(i0 + i) % 3];
+    for (let k = 0; k < postes[p].travail; k++) pat.push(p);
+    for (let k = 0; k < postes[p].repos; k++) pat.push('REPOS');
+  }
+  return pat;
+}
+function typeTheorique(d, ctx) {
+  if (!ctx.debut || !ctx.pat.length) return 'REPOS';
+  const n = nbJours(ctx.debut, d);
+  return n < 0 ? 'REPOS' : ctx.pat[n % ctx.pat.length];
+}
+/* Pointage effectif d'un jour = schéma théorique + correction manuelle éventuelle */
+function jourEffectif(d, ctx) {
+  const k = iso(d), c = corrections[k] || {}, type = c.type || typeTheorique(d, ctx), p = ctx.postes[type];
+  return { k, type, debut: c.debut || (p ? p.debut : ''), fin: c.fin || (p ? p.fin : ''),
+           ferie: c.ferie !== undefined ? c.ferie : ferieAuto(d), manuel: !!corrections[k] };
+}
+/* Décompte minute par minute d'un poste (gère le chevauchement de minuit) */
+function mesurerPoste(j, ctx) {
+  const a = hm(j.debut), b = hm(j.fin);
+  if (a === null || b === null) return null;
+  let dur = b - a; if (dur <= 0) dur += 1440;                    // fin ≤ début : le poste finit le lendemain
+  const base = depuisISO(j.k), nd = hm(ctx.nuit.debut), nf_ = hm(ctx.nuit.fin);
+  const r = { min:dur, nuit:0, we:0, ferie:0 };
+  for (let m = 0; m < dur; m++) {
+    const t = a + m, dec = Math.floor(t / 1440), mm = t % 1440, d = ajouter(base, dec);   // jour calendaire réel de cette minute
+    if (nd > nf_ ? (mm >= nd || mm < nf_) : (mm >= nd && mm < nf_)) r.nuit++;
+    if (ctx.weekend.includes(d.getDay())) r.we++;
+    if (dec === 0 ? j.ferie : ferieJour(d)) r.ferie++;
+  }
+  return r;
+}
+
+/* ---------- Identité ---------- */
+function verifNIR(s) {
+  const v = s.replace(/\s/g, '').toUpperCase();
+  if (!v) return 'Numéro de sécurité sociale requis.';
+  if (v.length !== 15) return `15 caractères attendus (13 + clé de 2 chiffres) ; ${v.length} saisis.`;
+  const m = /^([1-478]\d{4})(\d{2}|2A|2B)(\d{6})(\d{2})$/.exec(v);
+  if (!m) return 'Format invalide (ex. : 1 85 05 78 006 084 36 ; 2A/2B admis pour la Corse).';
+  const dep = m[2] === '2A' ? '19' : m[2] === '2B' ? '18' : m[2];      // règle Corse
+  const cle = 97 - (Number(m[1] + dep + m[3]) % 97);
+  return cle === Number(m[4]) ? '' : `Clé incorrecte (clé attendue : ${pad(cle)}).`;
+}
+function validerIdentite() {
+  const reNom = /^[\p{L}][\p{L} '’-]*$/u, val = id => $(id).value.trim();
+  const e = {
+    nom: val('nom') && !reNom.test(val('nom')) ? 'Caractères invalides.' : '',
+    prenom: val('prenom') && !reNom.test(val('prenom')) ? 'Caractères invalides.' : '',
+    nir: val('nir') ? verifNIR(val('nir')) : '',
+    siret: val('siret') && !/^\d{14}$/.test(val('siret').replace(/\s/g, '')) ? '14 chiffres attendus.' : ''
+  };
+  Object.keys(e).forEach(k => { $('e_'+k).textContent = e[k]; });
+  return e;
+}
+const identiteComplete = () => {
+  const e = validerIdentite();
+  return $('nom').value.trim() && $('prenom').value.trim() && !e.nom && !e.prenom && !e.siret && !verifNIR($('nir').value);
+};
+
+/* ---------- Construction de l'interface ---------- */
+const champ = (id, v) => `<input id="${id}" inputmode="decimal" value="${fmt(v)}">`;
+function construire(c) {
+  const auj = new Date(), mois = `${auj.getFullYear()}-${pad(auj.getMonth()+1)}`;
+  $('mois').value = mois; $('debut').value = mois + '-01'; $('depart').value = c.rotation.depart;
+  $('seuil').value = fmt(c.seuilHS); $('taux').value = fmt(c.tauxHoraire);
+  $('nuit_d').value = c.nuit.debut; $('nuit_f').value = c.nuit.fin;
+  $('ifm').value = fmt(c.ifm); $('iccp').value = fmt(c.iccp);
+  $('plafond').value = fmt(c.plafondSS); $('abatt').value = fmt(c.abattCSG); $('mutuelle').value = fmt(c.mutuelle);
+  $('inclIfm').checked = true; $('inclIccp').checked = true; $('alsace').checked = false;
+
+  $('postes').innerHTML = Object.keys(c.postes).map(p => { const x = c.postes[p]; return `<tr><td>${x.label}</td>
+    <td><input id="p_${p}_d" type="time" value="${x.debut}"></td><td><input id="p_${p}_f" type="time" value="${x.fin}"></td>
+    <td class="n">${champ('p_'+p+'_t', x.travail)}</td><td class="n">${champ('p_'+p+'_r', x.repos)}</td></tr>`; }).join('');
+  $('wk').innerHTML = [1,2,3,4,5,6,0].map(i =>
+    `<label class="inl"><input type="checkbox" id="wk${i}"${c.weekend.includes(i) ? ' checked' : ''}>${NOMS_JOURS[i]}</label>`).join('');
+  $('heures').innerHTML = c.heures.map(h => `<tr><td>${h.label}</td><td class="n" id="q_h_${h.id}">0</td>
+    <td class="n">${h.maj === null ? '—' : champ('m_'+h.id, h.maj)}</td><td class="n" id="e_${h.id}"></td></tr>`).join('');
+  $('primes').innerHTML = c.primes.map(p => `<tr><td>${p.label}</td><td class="n" id="q_${p.id}">0</td><td>${p.unite}</td>
+    <td>${champ('u_'+p.id, p.montant)}</td>
+    <td><select id="t_${p.id}"><option value="salaire"${p.type==='salaire'?' selected':''}>Salaire</option>
+    <option value="frais"${p.type==='frais'?' selected':''}>Frais</option></select></td></tr>`).join('');
+  $('cotis').innerHTML = c.cotis.map(k => `<tr><td>${k.label}</td><td>${LIB_ASSIETTE[k.assiette]}</td>
+    <td class="n">${champ('c_'+k.id, k.taux)}</td></tr>`).join('');
+}
+
+/* Contexte : rotation, postes, plages de décompte */
+function lireContexte() {
+  const postes = {};
+  Object.keys(CONFIG.postes).forEach(p => {
+    const d = CONFIG.postes[p];
+    postes[p] = { label:d.label, debut:$(`p_${p}_d`).value || d.debut, fin:$(`p_${p}_f`).value || d.fin,
+      travail:Math.floor(lire(`p_${p}_t`, d.label + ' – jours travaillés')), repos:Math.floor(lire(`p_${p}_r`, d.label + ' – jours de repos')) };
+  });
+  const debut = $('debut').value ? depuisISO($('debut').value) : null;
+  if (!debut) erreurs.push('Date de début de rotation manquante : le planning théorique est vide (corrige les jours à la main ou renseigne la date).');
+  return { postes, debut, pat: construireSchema(postes, $('depart').value),
+    nuit:{ debut:$('nuit_d').value || CONFIG.nuit.debut, fin:$('nuit_f').value || CONFIG.nuit.fin },
+    weekend:[0,1,2,3,4,5,6].filter(i => $('wk'+i).checked) };
+}
+
+/* ---------- Éditeur d'un jour ---------- */
+function afficherEditeur() {
+  if (!selection || !CTX) { $('editeur').innerHTML = '<span class="mut">Clique sur un jour pour corriger son pointage.</span>'; return; }
+  const d = depuisISO(selection), j = jourEffectif(d, CTX), travail = ['S1','S2','S3'].includes(j.type), nomF = ferieNom(d);
+  const opt = t => `<option value="${t}"${j.type===t?' selected':''}>${t==='REPOS'?'Repos':t==='ABS'?'Absence':CTX.postes[t].label}</option>`;
+  $('editeur').innerHTML = `<b>${d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</b>
+    <div class="row2" style="margin-top:8px">
+      <div><label>Pointage</label><select data-f="type">${['S1','S2','S3','REPOS','ABS'].map(opt).join('')}</select></div>
+      <div><label>Début (heure réelle)</label><input type="time" data-f="debut" value="${j.debut}"${travail?'':' disabled'}></div>
+      <div><label>Fin (heure réelle)</label><input type="time" data-f="fin" value="${j.fin}"${travail?'':' disabled'}></div>
+      <div><label>&nbsp;</label><label class="inl"><input type="checkbox" data-f="ferie"${j.ferie?' checked':''}> Jour férié${nomF ? ' – ' + nomF : ''}</label></div>
+    </div>
+    <button type="button" id="razJour">Revenir au planning théorique pour ce jour</button>`;
+}
+
+/* ---------- Calcul ---------- */
+function calculer() {
+  erreurs.length = 0;
+  validerIdentite();
+  const taux = lire('taux', 'Taux horaire'), seuil = lire('seuil', 'Seuil mensuel HS');
+  const ctx = CTX = lireContexte();
+  const [an, mo] = ($('mois').value || '').split('-').map(Number);
+  if (!an || !mo) { $('msgs').innerHTML = '<div class="err">Choisis un mois valide.</div>'; return; }
+  const nb = new Date(an, mo, 0).getDate();
+
+  // 1) Parcours du mois : cellules du calendrier + cumul des pointages
+  const cumul = { min:0, nuit:0, we:0, ferie:0, jours:0, nuits:0, abs:0 };
+  const parPoste = { S1:{n:0,min:0}, S2:{n:0,min:0}, S3:{n:0,min:0} };
+  const feries = [];
+  let cal = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(x => `<div class="e">${x}</div>`).join('');
+  cal += '<div class="jr vide"></div>'.repeat((new Date(an, mo-1, 1).getDay() + 6) % 7);
+  for (let n = 1; n <= nb; n++) {
+    const d = new Date(an, mo-1, n), j = jourEffectif(d, ctx), nomF = ferieNom(d) || 'Férié (manuel)';
+    let info = COURT[j.type];
+    if (parPoste[j.type]) {
+      const r = mesurerPoste(j, ctx);
+      if (!r) { erreurs.push(`Heures invalides le ${n}/${pad(mo)}.`); info += '<br>?'; }
+      else {
+        cumul.min += r.min; cumul.nuit += r.nuit; cumul.we += r.we; cumul.ferie += r.ferie; cumul.jours++;
+        if (r.nuit > 0) cumul.nuits++;
+        parPoste[j.type].n++; parPoste[j.type].min += r.min;
+        info += `<br>${fmt(r2(r.min / 60))} h`;
+      }
+    } else if (j.type === 'ABS') cumul.abs++;
+    if (j.ferie) feries.push(`${n} ${d.toLocaleDateString('fr-FR', { weekday:'short' })} – ${nomF}`);
+    cal += `<div class="jr t-${j.type}${j.ferie ? ' fer' : ''}${j.k === selection ? ' sel' : ''}" data-k="${j.k}"><b>${n}</b>${j.ferie ? ' ★' : ''}${j.manuel ? ' •' : ''}<br>${info}${j.ferie ? `<span class="fn">${nomF}</span>` : ''}</div>`;
+  }
+  $('cal').innerHTML = cal;
+  $('listeF').innerHTML = feries.length ? '<b>Jours fériés du mois :</b> ' + feries.join(' · ') : 'Aucun jour férié ce mois-ci.';
+
+  // 2) Heures par catégorie (HS = heures pointées au-delà du seuil mensuel)
+  const totalH = cumul.min / 60, hs = Math.max(0, totalH - seuil);
+  const qte = { norm: totalH - hs, hs, nuit: cumul.nuit / 60, we: cumul.we / 60, ferie: cumul.ferie / 60 };
+
+  // 3) Rémunération
+  const lignes = []; let salaire = 0;
+  CONFIG.heures.forEach(h => {
+    const m = h.maj === null ? 0 : lire('m_' + h.id, 'Majoration ' + h.label), q = qte[h.id];
+    const tAp = h.mode === 'base' ? taux : h.mode === 'total' ? taux * (1 + m / 100) : taux * m / 100;
+    $('q_h_' + h.id).textContent = fmt(r2(q)); $('e_' + h.id).textContent = fmt(r2(tAp)) + ' €/h';
+    const montant = r2(q * tAp);
+    if (q > 0) lignes.push({ label:h.label, montant, base:r2(q), taux:tAp, detail:`${fmt(r2(q))} h × ${fmt(r2(tAp))} €` });
+    salaire += montant;
+  });
+  let frais = 0; const lignesFrais = [];
+  CONFIG.primes.forEach(p => {
+    const q = p.unite === 'nuit' ? cumul.nuits : cumul.jours, u = lire('u_' + p.id, p.label), montant = r2(q * u);
+    $('q_' + p.id).textContent = q;
+    if (q > 0 && montant > 0) {
+      const l = { label:p.label, montant, base:q, taux:u, detail:`${q} ${p.unite}(s) × ${fmt(u)} €` };
+      if ($('t_' + p.id).value === 'salaire') { lignes.push(l); salaire += montant; } else { lignesFrais.push(l); frais += montant; }
+    }
+  });
+  salaire = r2(salaire);
+
+  // IFM / ICCP : incluses ou non dans le calcul final (cases à cocher)
+  const pIfm = lire('ifm', 'IFM'), pIccp = lire('iccp', 'ICCP'), inclIfm = $('inclIfm').checked, inclIccp = $('inclIccp').checked;
+  const ifmAcq = r2(salaire * pIfm / 100), iccpAcq = r2((salaire + ifmAcq) * pIccp / 100);   // montants acquis (information)
+  const ifm = inclIfm ? ifmAcq : 0;
+  const iccp = inclIccp ? r2((salaire + ifm) * pIccp / 100) : 0;                              // base ICCP = salaire + IFM incluse
+  const brut = r2(salaire + ifm + iccp);
+
+  // 4) Cotisations
+  const plafond = lire('plafond', 'Plafond Sécu'), abatt = lire('abatt', 'Assiette CSG/CRDS');
+  const assiettes = { brut, plaf:Math.min(brut, plafond), csg:r2(brut * abatt / 100) };
+  let totalCotis = 0; const lignesCotis = [];
+  CONFIG.cotis.forEach(k => {
+    const t = lire('c_' + k.id, k.label), base = assiettes[k.assiette], m = r2(base * t / 100);
+    lignesCotis.push({ label:k.label, montant:m, base, taux:t, detail:`${fmt(t)} % × ${eur(base)}` }); totalCotis += m;
+  });
+  const mut = lire('mutuelle', 'Mutuelle / prévoyance');
+  if (mut > 0) { lignesCotis.push({ label:'Mutuelle / prévoyance', montant:r2(mut), detail:'montant fixe' }); totalCotis += mut; }
+  totalCotis = r2(totalCotis);
+  const net = r2(brut - totalCotis), netPaye = r2(net + frais);
+
+  DERNIER = { periode: new Date(an, mo-1, 1).toLocaleDateString('fr-FR', { month:'long', year:'numeric' }),
+    debutP:`01/${pad(mo)}/${an}`, finP:`${pad(nb)}/${pad(mo)}/${an}`,
+    parPoste, abs:cumul.abs, totalH, qte, lignes, salaire, ifm, iccp, pIfm, pIccp, inclIfm, inclIccp, ifmAcq, iccpAcq,
+    brut, lignesCotis, totalCotis, net, lignesFrais, frais, netPaye };
+  afficherSynthese(); afficher();
+  try { sauvegarder(); } catch (e) {}
+}
+
+/* ---------- Affichage ---------- */
+function afficherSynthese() {
+  const r = DERNIER;
+  let h = '<thead><tr><th>Pointages du mois</th><th class="n">Postes</th><th class="n">Heures</th></tr></thead>';
+  ['S1','S2','S3'].forEach(p => { h += `<tr><td>${CTX.postes[p].label} (${CTX.postes[p].debut}–${CTX.postes[p].fin})</td><td class="n">${r.parPoste[p].n}</td><td class="n">${fmt(r2(r.parPoste[p].min / 60))} h</td></tr>`; });
+  h += `<tr><td>Absences</td><td class="n">${r.abs}</td><td class="n">—</td></tr>`;
+  h += `<tr><td><b>Total pointé</b></td><td class="n"><b>${r.parPoste.S1.n + r.parPoste.S2.n + r.parPoste.S3.n}</b></td><td class="n"><b>${fmt(r2(r.totalH))} h</b></td></tr>`;
+  $('synth').innerHTML = h;
+}
+function afficher() {
+  const r = DERNIER;
+  const ligne = (l, s = '') => `<tr><td>${l.label}<br><span class="mut">${l.detail || ''}</span></td><td class="n">${s}${eur(l.montant)}</td></tr>`;
+  const nonVersee = (lab, acq) => `<tr><td>${lab}<br><span class="mut">non incluse ce mois-ci – acquise : ${eur(acq)}</span></td><td class="n">—</td></tr>`;
+  const sec = t => `<tr class="sec"><td colspan="2">${t}</td></tr>`;
+  let h = sec(`Salaire de base, majorations et primes – ${r.periode}`);
+  h += r.lignes.length ? r.lignes.map(l => ligne(l)).join('') : '<tr><td colspan="2" class="mut">Aucun poste pointé ce mois-ci.</td></tr>';
+  h += `<tr class="tot"><td>Salaire soumis (base IFM)</td><td class="n">${eur(r.salaire)}</td></tr>`;
+  h += sec("Indemnités d'intérim");
+  h += r.inclIfm ? ligne({ label:'IFM – indemnité de fin de mission', montant:r.ifm, detail:`${fmt(r.pIfm)} % × ${eur(r.salaire)}` })
+                 : nonVersee('IFM – indemnité de fin de mission', r.ifmAcq);
+  h += r.inclIccp ? ligne({ label:'ICCP – indemnité compensatrice de congés payés', montant:r.iccp, detail:`${fmt(r.pIccp)} % × ${eur(r2(r.salaire + r.ifm))} (salaire + IFM incluse)` })
+                  : nonVersee('ICCP – indemnité compensatrice de congés payés', r.iccpAcq);
+  h += `<tr class="tot"><td>TOTAL BRUT</td><td class="n">${eur(r.brut)}</td></tr>`;
+  h += sec('Cotisations salariales') + r.lignesCotis.map(l => ligne(l, '− ')).join('');
+  h += `<tr class="tot"><td>Total cotisations</td><td class="n">− ${eur(r.totalCotis)}</td></tr>`;
+  h += `<tr class="tot"><td>NET AVANT IMPÔT (sur brut)</td><td class="n">${eur(r.net)}</td></tr>`;
+  if (r.lignesFrais.length) h += sec('Indemnités de frais (non soumises)') + r.lignesFrais.map(l => ligne(l, '+ ')).join('');
+  h += `<tr class="big"><td>NET À PAYER AVANT IMPÔT</td><td class="n">${eur(r.netPaye)}</td></tr>`;
+  $('res').innerHTML = h;
+  $('msgs').innerHTML = erreurs.map(e => `<div class="err">${e}</div>`).join('');
+}
+
+/* ---------- Sauvegarde locale (le N° de sécurité sociale n'est JAMAIS enregistré) ---------- */
+function sauvegarder() {
+  const champs = {};
+  document.querySelectorAll('input[id], select[id]').forEach(el => {
+    if (el.id === 'nir') return;
+    champs[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  localStorage.setItem(STORE_KEY, JSON.stringify({ champs, corrections }));
+}
+function restaurer() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    Object.keys(s.champs || {}).forEach(id => {
+      const el = $(id); if (!el) return;
+      if (el.type === 'checkbox') el.checked = s.champs[id]; else el.value = s.champs[id];
+    });
+    corrections = s.corrections || {};
+  } catch (e) {}
+}
+
+/* ---------- Générateur PDF minimal (sans bibliothèque) ----------
+   Coordonnées « top » = distance depuis le haut de la page (A4 : 595 × 842 pt). */
+function creerPDF() {
+  const W = 595, H = 842, pages = []; let cur;
+  const NOIR = [.1, .1, .12];
+  const nouvelle = () => { cur = []; pages.push(cur); };
+  const enc = s => String(s).replace(/[\u00a0\u202f\u2009]/g, ' ').replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[–—−]/g, '-').replace(/★/g, '*').replace(/€/g, '\u0001E').replace(/[^\x20-\xFF\u0001]/g, '?')
+    .replace(/\\|\(|\)/g, '\\$&').replace(/\u0001E/g, '\\200');             // € = \200 en WinAnsi
+  // Largeur approximative en Helvetica (chiffres exacts) pour l'alignement à droite
+  const larg = (s, size, gras) => { let w = 0;
+    String(s).replace(/[\u00a0\u202f\u2009]/g, ' ').split('').forEach(c => {
+      w += /[0-9€]/.test(c) ? 556 : ' ,.;:/'.includes(c) ? 278 : c === '-' ? 333 : c === '%' ? 889 : (c === '+' || c === '×') ? 584
+         : /[ilj'|]/.test(c) ? 240 : /[mwMW]/.test(c) ? 830 : gras ? 600 : 540; });
+    return w * size / 1000; };
+  nouvelle();
+  const api = {
+    page: nouvelle,
+    t: (x, top, s, size = 8.5, f = 'F1', c = NOIR) => cur.push(`BT ${c.join(' ')} rg /${f} ${size} Tf ${x.toFixed(1)} ${(H - top).toFixed(1)} Td (${enc(s)}) Tj ET`),
+    tr: (xr, top, s, size = 8.5, f = 'F1', c = NOIR) => api.t(xr - larg(s, size, f === 'F2'), top, s, size, f, c),
+    tc: (xc, top, s, size = 8.5, f = 'F1', c = NOIR) => api.t(xc - larg(s, size, f === 'F2') / 2, top, s, size, f, c),
+    rect: (x, top, w, h, fill, stroke) => cur.push(`q ${fill ? fill.join(' ') + ' rg ' : ''}${stroke ? stroke.join(' ') + ' RG 0.5 w ' : ''}${x} ${(H - top - h).toFixed(1)} ${w} ${h} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'} Q`),
+    line: (x1, x2, top, c, lw = 0.4) => cur.push(`q ${c.join(' ')} RG ${lw} w ${x1} ${(H - top).toFixed(1)} m ${x2} ${(H - top).toFixed(1)} l S Q`),
+    blob(pied) {
+      pages.forEach((p, i) => {   // pied de page + numéro sur chaque page
+        cur = p; api.line(36, 559, 806, [.7, .72, .76]);
+        api.t(36, 818, pied, 6.8, 'F1', [.45, .47, .52]); api.tr(559, 818, `Page ${i + 1}/${pages.length}`, 6.8, 'F1', [.45, .47, .52]);
+      });
+      let out = '%PDF-1.4\n'; const off = [];
+      const add = (n, b) => { off[n] = out.length; out += `${n} 0 obj\n${b}\nendobj\n`; };
+      add(1, '<< /Type /Catalog /Pages 2 0 R >>');
+      add(2, `<< /Type /Pages /Kids [${pages.map((_, i) => `${6 + i * 2} 0 R`).join(' ')}] /Count ${pages.length} >>`);
+      add(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+      add(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+      add(5, '<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>');
+      pages.forEach((p, i) => {
+        const s = p.join('\n');
+        add(6 + i * 2, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${7 + i * 2} 0 R >>`);
+        add(7 + i * 2, `<< /Length ${s.length} >>\nstream\n${s}\nendstream`);
+      });
+      const n = 6 + pages.length * 2, xref = out.length;
+      out += `xref\n0 ${n}\n0000000000 65535 f \n`;
+      for (let k = 1; k < n; k++) out += String(off[k]).padStart(10, '0') + ' 00000 n \n';
+      out += `trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+      return new Blob([Uint8Array.from(out, c => c.charCodeAt(0))], { type:'application/pdf' });
+    }
+  };
+  return api;
+}
+
+/* ---------- Bulletin de paie PDF ---------- */
+function genererPDF() {
+  if (!identiteComplete()) {
+    $('msgs').innerHTML = '<div class="err">Renseigne le nom, le prénom et un numéro de sécurité sociale valide (section 1) avant de générer le PDF.</div>' + $('msgs').innerHTML;
+    window.scrollTo({ top:0, behavior:'smooth' }); return;
+  }
+  const r = DERNIER, d = creerPDF(), M = 36, R = 559;
+  const BLANC = [1,1,1], BLEU = [.13,.27,.5], GRIS = [.93,.94,.96], LIG = [.8,.82,.86], MUT = [.45,.47,.52];
+  const v = id => $(id).value.trim() || '-';
+  const nir = $('nir').value.replace(/\s/g, '').toUpperCase().replace(/^(.)(..)(..)(..)(...)(...)(..)$/, '$1 $2 $3 $4 $5 $6 $7');
+  const XB = 335, XT = 398, XG = 478, XR = R - 6;                  // colonnes alignées à droite : base, taux, à payer, à déduire
+
+  // Bandeau d'en-tête
+  d.rect(M, 28, R - M, 48, BLEU);
+  d.t(M + 10, 50, 'BULLETIN DE PAIE', 16, 'F2', BLANC);
+  d.t(M + 10, 66, "Simulation - mission d'intérim, système 5x8", 8, 'F1', BLANC);
+  d.tr(R - 10, 50, `Période du ${r.debutP} au ${r.finP}`, 10, 'F2', BLANC);
+  d.tr(R - 10, 66, `Édité le ${new Date().toLocaleDateString('fr-FR')}`, 8, 'F1', BLANC);
+
+  // Cadres employeur / salarié
+  const boite = (x, titre, lignes) => {
+    d.rect(x, 86, 255, 84, null, LIG); d.rect(x, 86, 255, 14, GRIS, LIG); d.t(x + 6, 96, titre, 7.5, 'F2', BLEU);
+    lignes.forEach((l, i) => d.t(x + 6, 115 + i * 13, l[0].slice(0, 52), l[1] ? 10 : 8.5, l[1] ? 'F2' : 'F1'));
+  };
+  boite(M, 'EMPLOYEUR (ENTREPRISE DE TRAVAIL TEMPORAIRE)', [[v('emp'), 1], [v('emp_adr')], ['SIRET : ' + v('siret')], ['Entreprise utilisatrice : ' + v('util')]]);
+  boite(R - 255, 'SALARIÉ', [[`${v('prenom')} ${$('nom').value.trim().toUpperCase()}`, 1], ['N° Sécurité sociale : ' + nir], ['Emploi : ' + v('emploi')], ['Statut : Intérimaire - Non-cadre - Système 5x8']]);
+
+  // Tableau principal
+  let y = 182;
+  const enteteTab = () => {
+    d.rect(M, y, R - M, 16, BLEU);
+    d.t(M + 6, y + 11, 'Libellé', 8, 'F2', BLANC); d.tr(XB, y + 11, 'Base', 8, 'F2', BLANC); d.tr(XT, y + 11, 'Taux', 8, 'F2', BLANC);
+    d.tr(XG, y + 11, 'À payer (€)', 8, 'F2', BLANC); d.tr(XR, y + 11, 'À déduire (€)', 8, 'F2', BLANC); y += 16;
+  };
+  const ensure = h => { if (y + h > 790) { d.page(); y = 40; enteteTab(); } };
+  const section = s => { ensure(30); d.rect(M, y, R - M, 14, GRIS); d.t(M + 6, y + 10, s, 8, 'F2', BLEU); y += 14; };
+  const lig = (lab, base, taux, gain, ret, gras) => {
+    ensure(14); const f = gras ? 'F2' : 'F1';
+    d.t(M + 6, y + 9.8, lab.slice(0, 60), 8.5, f);
+    if (base !== '') d.tr(XB, y + 9.8, base, 8.5, f); if (taux !== '') d.tr(XT, y + 9.8, taux, 8.5, f);
+    if (gain !== '') d.tr(XG, y + 9.8, gain, 8.5, f); if (ret !== '') d.tr(XR, y + 9.8, ret, 8.5, f);
+    d.line(M, R, y + 14, LIG); y += 14;
+  };
+  enteteTab();
+  section('RÉMUNÉRATION BRUTE');
+  r.lignes.forEach(l => lig(l.label, nf(l.base), nf(l.taux, 4), nf(l.montant), ''));
+  lig('Salaire brut soumis à cotisations', '', '', nf(r.salaire), '', true);
+  if (r.inclIfm) lig('Indemnité de fin de mission (IFM)', nf(r.salaire), nf(r.pIfm, 4) + ' %', nf(r.ifm), '');
+  if (r.inclIccp) lig('Indemnité compensatrice de congés payés (ICCP)', nf(r2(r.salaire + r.ifm)), nf(r.pIccp, 4) + ' %', nf(r.iccp), '');
+  lig('TOTAL BRUT', '', '', nf(r.brut), '', true);
+  section('COTISATIONS ET CONTRIBUTIONS SALARIALES');
+  r.lignesCotis.forEach(l => lig(l.label, l.base !== undefined ? nf(l.base) : '', l.taux !== undefined ? nf(l.taux, 4) + ' %' : '', '', nf(l.montant)));
+  lig('TOTAL DES COTISATIONS SALARIALES', '', '', '', nf(r.totalCotis), true);
+  section('NET');
+  lig('Net avant impôt sur le revenu (sur brut)', '', '', nf(r.net), '', true);
+  if (r.lignesFrais.length) {
+    section('INDEMNITÉS DE FRAIS (NON SOUMISES À COTISATIONS)');
+    r.lignesFrais.forEach(l => lig(l.label, nf(l.base), nf(l.taux, 4), nf(l.montant), ''));
+  }
+
+  // Bandeau récapitulatif
+  ensure(70); y += 10;
+  const bw = (R - M - 12) / 4;
+  [['TOTAL BRUT', r.brut], ['COTISATIONS SALARIALES', r.totalCotis], ['NET AVANT IMPÔT', r.net], ['NET À PAYER AVANT IMPÔT', r.netPaye]].forEach((b, i) => {
+    const x = M + i * (bw + 4), fin = i === 3;
+    d.rect(x, y, bw, 38, fin ? BLEU : GRIS, fin ? null : LIG);
+    d.tc(x + bw / 2, y + 14, b[0], 6.8, 'F2', fin ? BLANC : MUT);
+    d.tc(x + bw / 2, y + 30, nf(b[1]) + ' €', 12, 'F2', fin ? BLANC : [.1, .1, .12]);
+  });
+  y += 46;
+  if (!r.inclIfm || !r.inclIccp) {   // indemnités non versées ce mois : rappel informatif
+    const nv = []; if (!r.inclIfm) nv.push(`IFM ${nf(r.ifmAcq)} €`); if (!r.inclIccp) nv.push(`ICCP ${nf(r.iccpAcq)} €`);
+    d.t(M, y + 8, 'Pour information - acquises, non incluses dans ce bulletin : ' + nv.join(' ; '), 8, 'F1', MUT); y += 14;
+  }
+
+  // Détail des heures pointées
+  ensure(110); y += 6;
+  d.t(M, y + 8, 'HEURES POINTÉES PAR POSTE', 8, 'F2', BLEU); d.t(304, y + 8, 'RÉCAPITULATIF DES HEURES', 8, 'F2', BLEU);
+  d.line(M, M + 255, y + 12, BLEU, 0.8); d.line(304, R, y + 12, BLEU, 0.8); y += 14;
+  const yG = y;
+  ['S1', 'S2', 'S3'].forEach(p => {
+    d.t(M + 2, y + 9, `${CTX.postes[p].label} (${CTX.postes[p].debut}-${CTX.postes[p].fin})`, 8);
+    d.tr(M + 195, y + 9, `${r.parPoste[p].n} poste(s)`, 8); d.tr(M + 253, y + 9, nf(r.parPoste[p].min / 60) + ' h', 8); y += 12;
+  });
+  d.t(M + 2, y + 9, 'Absences (jours)', 8); d.tr(M + 195, y + 9, String(r.abs), 8); y += 12;
+  d.t(M + 2, y + 9, 'Total heures pointées', 8, 'F2'); d.tr(M + 253, y + 9, nf(r.totalH) + ' h', 8, 'F2');
+  let y2 = yG;
+  CONFIG.heures.forEach(h => { d.t(306, y2 + 9, h.label, 8); d.tr(R - 2, y2 + 9, nf(r.qte[h.id]) + ' h', 8); y2 += 12; });
+  y += 20;
+  d.t(M, y + 8, 'Aucun prélèvement à la source ni 13e mois dans ce calcul.', 7, 'F1', MUT);
+  d.t(M, y + 18, 'Taux et règles paramétrables : à vérifier avec le contrat et la fiche de paie officielle.', 7, 'F1', MUT);
+
+  livrerPDF(d.blob('Simulation établie à partir des pointages saisis - document estimatif non contractuel, ne constitue pas un bulletin de paie officiel.'), `fiche-paie-${$('mois').value}.pdf`);
+}
+
+/* ---------- Livraison du PDF ----------
+   Application Android (Capacitor) : feuille de partage native (enregistrer, envoyer…).
+   Navigateur / PWA : téléchargement classique. */
+async function livrerPDF(blob, nom) {
+  const cap = window.Capacitor, P = cap && cap.Plugins;
+  if (cap && cap.isNativePlatform && cap.isNativePlatform() && P && P.Filesystem && P.Share) {
+    try {
+      const b64 = await new Promise((ok, ko) => { const f = new FileReader(); f.onload = () => ok(String(f.result).split(',')[1]); f.onerror = ko; f.readAsDataURL(blob); });
+      const w = await P.Filesystem.writeFile({ path: nom, data: b64, directory: 'CACHE' });
+      await P.Share.share({ title: nom, url: w.uri, dialogTitle: 'Enregistrer ou envoyer la fiche de paie' });
+      return;
+    } catch (e) { /* repli sur le téléchargement classique */ }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/* ---------- Démarrage et événements ---------- */
+construire(CONFIG);
+restaurer();
+document.addEventListener('input', calculer);          // tout changement déclenche le recalcul
+document.addEventListener('change', calculer);
+$('cal').addEventListener('click', e => {              // sélection d'un jour du calendrier
+  const c = e.target.closest('.jr[data-k]'); if (!c) return;
+  selection = c.dataset.k; calculer(); afficherEditeur();
+});
+$('editeur').addEventListener('change', e => {         // correction manuelle d'un pointage
+  const f = e.target.dataset.f; if (!f || !selection) return;
+  const c = corrections[selection] = corrections[selection] || {};
+  if (f === 'type') { c.type = e.target.value; delete c.debut; delete c.fin; }   // horaires par défaut du nouveau poste
+  else if (f === 'ferie') c.ferie = e.target.checked;
+  else c[f] = e.target.value;
+  calculer(); afficherEditeur();
+});
+$('editeur').addEventListener('click', e => {
+  if (e.target.id === 'razJour') { delete corrections[selection]; calculer(); afficherEditeur(); }
+});
+$('pdf').addEventListener('click', genererPDF);
+$('reset').addEventListener('click', () => {
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  corrections = {}; selection = null; construire(CONFIG); calculer(); afficherEditeur();
+});
+calculer();
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
